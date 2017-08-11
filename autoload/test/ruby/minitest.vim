@@ -88,17 +88,27 @@ function! s:nearest_test(position) abort
   let syntax = s:syntax(a:position['file'])
   let name = test#base#nearest_test(a:position, g:test#ruby#patterns)
 
-  let namespace = filter([test#base#escape_regex(join(name['namespace'], '::'))], '!empty(v:val)')
   if empty(name['test'])
+    let namespace = filter([test#base#escape_regex(name['namespace'][1])], '!empty(v:val)')
     let test = []
   else
-    let test_name = test#base#escape_regex(name['test'][0]).'$'
-    if syntax ==# 'rails'    " test('foo') { ... }
-      let test = ['test_'.substitute(test_name, '\s\+', '_', 'g')]
-    elseif syntax ==# 'spec' " it('foo') { ... }
-      let test = ['test_\d+_'.test_name]
-    else
+    let test_name = test#base#escape_regex(name['test'][0])
+
+    if syntax ==# 'shoulda'
+      let namespace = []
+      let test_name .= '\.'
       let test = [test_name]
+    else
+      let namespace = filter([test#base#escape_regex(join(name['namespace'], '::'))], '!empty(v:val)')
+      let test_name .= '$'
+
+      if syntax ==# 'rails'    " test('foo') { ... }
+        let test = ['test_'.substitute(test_name, '\s\+', '_', 'g')]
+      elseif syntax ==# 'spec' " it('foo') { ... }
+        let test = ['test_\d+_'.test_name]
+      else
+        let test = [test_name]
+      endif
     endif
   endif
 
@@ -112,6 +122,8 @@ function! s:syntax(file) abort
     return 'rails'
   elseif !empty(filter(copy(lines), "v:val =~# g:test#ruby#patterns['test'][2]"))
     return 'spec'
+  elseif !empty(filter(copy(lines), 'v:val =~# g:test#ruby#patterns["test"][3]'))
+    return 'shoulda'
   else
     return 'test'
   endif
